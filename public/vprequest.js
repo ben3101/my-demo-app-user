@@ -5,6 +5,7 @@ let vcissuer = params.get('vcissuer');
 let nonce = params.get('nonce');
 let domain = params.get('domain');
 let redirect_uri = params.get('redirect_uri');
+let code = params.get('code');
 
 window.setTimeout(()=>{
   vp_approval();
@@ -13,7 +14,15 @@ window.setTimeout(()=>{
 async function vp_approval(){
   let approved = confirm(`Please confirm you would like to create a VP with the following information: \n\nUser: ${user} \nApplication: ${application} \nIssuer: ${vcissuer}\nDomain:${domain}`);
   if(approved){
-    let url = 'http://localhost:8081/create_vp';
+    await tryCreateVP();
+  }else{
+    alert('VP not granted.');
+    window.location.href = `${redirect_uri}`;
+  }
+}
+
+async function tryCreateVP(){
+  let url = 'http://localhost:8081/create_vp';
     let response = await fetch(url, {
       method: "POST",
       headers: {
@@ -26,14 +35,16 @@ async function vp_approval(){
         vcissuer: vcissuer,
         nonce: nonce,
         domain: domain,
+        code: code
       })
     });
     let VP = await response.text();
-    alert('VP granted. Redirecting to app...');
-    window.location.href = `${redirect_uri}?vp=${VP}`;
-  }else{
-    alert('VP not granted.');
-    window.location.href = `${redirect_uri}?vp=${VP}`;
-  }
+    if(!(response.status === 200)){
+      alert('Error generating VP. Returning to App.');
+      window.location.href = `${redirect_uri}`;
+    }else{
+      alert('VP granted. Redirecting to App...');
+      window.location.href = `${redirect_uri}?vp=${VP}`;
+    }
 }
 

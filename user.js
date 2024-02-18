@@ -8,7 +8,10 @@ const appName = 'my-demo-app';
 const userID = 'did:web:ben3101.solidcommunity.net';
 const issuerID = 'did:web:issuer123.solidcommunity.net';
 //trusted uri for the App
-const trusted_uri = "http://localhost:8080";
+const trusted_uri = "http://localhost:8080/";
+//a code is generated when redirecting to the vprequest.html page
+//this code is required when a request is sent to the create_vp endpoint
+let validCodes = [];
 //create server to listen to http requests on port 8081
 const app = express();
 const port = 8081;
@@ -28,11 +31,15 @@ app.use(express.static('public'));
 app.post('/vprequest', async (req, res) => {
   console.log("Received VP Request at "+(Date.now()));
   const {user, vcissuer, application, nonce, domain, redirect_uri} = req.body;
-  console.log(`\nuser: ${user}\nissuer: ${vcissuer}\napp: ${application}\nnonce: ${nonce}\ndomain: ${domain}\n`);
+  console.log(`\nuser: ${user}\nissuer: ${vcissuer}\napp: ${application}\nnonce: ${nonce}\ndomain: ${domain}\nredirect_uri: ${redirect_uri}`);
   //check if VP can be made for the given details, and the URI matches the trusted URI for this app. 
-  if((application === appName && user === userID && vcissuer === issuerID && redirect_uri === trusted_uri)){
-    console.log(`Redirecting to /vprequest.html?user=${user}&application=${application}&vcissuer=${vcissuer}&nonce=${nonce}&domain=${domain}&redirect_uri=${redirect_uri}`);
-    let url = `/vprequest.html?user=${user}&application=${application}&vcissuer=${vcissuer}&nonce=${encodeURIComponent(nonce)}&domain=${domain}&redirect_uri=${redirect_uri}`
+  if((application === appName && user === userID && vcissuer === issuerID && 
+    redirect_uri.substring(0,trusted_uri.length) === trusted_uri)){
+    const crypto = import('crypto');
+    const code = (await crypto).randomBytes(16).toString('base64');
+    validCodes.push(code);
+    console.log(`Redirecting to /vprequest.html?user=${user}&application=${application}&vcissuer=${vcissuer}&nonce=${nonce}&domain=${domain}&redirect_uri=${redirect_uri}&code=${code}`);
+    let url = `/vprequest.html?user=${user}&application=${application}&vcissuer=${vcissuer}&nonce=${encodeURIComponent(nonce)}&domain=${domain}&redirect_uri=${redirect_uri}&code=${encodeURIComponent(code)}`;
     res.redirect(url);
   }else{
       res.status(401).send('Unable to create a VP with those details.')
@@ -41,14 +48,21 @@ app.post('/vprequest', async (req, res) => {
 
 //from html page, this is called and a VP is returned
 app.post('/create_vp', async (req, res) => {
-  const {user, vcissuer, application, nonce, domain} = req.body;
-  console.log("Creating VC...");
-  const VC = await createVC(vcissuer, user);
-  console.log("\nCreating VP...");
-  const VP = await createVP(VC, nonce, domain, user, application);
-  console.log("VP (JWT):\n"+JSON.stringify(VP));
-  console.log("\nSending VP back to app...");
-  res.send(VP);
+  const {user, vcissuer, application, nonce, domain, code} = req.body;
+  if(!validCodes.includes(code)){
+    console.log('Code given: '+code+' does is not valid');
+    console.log('Valid Codes:'+validCodes);
+    res.status(403).send('Invalid code.');
+  }else{
+    console.log("Creating VC...");
+    const VC = await createVC(vcissuer, user);
+    console.log("\nCreating VP...");
+    const VP = await createVP(VC, nonce, domain, user, application);
+    console.log("VP (JWT):\n"+JSON.stringify(VP));
+    console.log("\nSending VP back to app...");
+    validCodes.pop(validCodes.indexOf(code));
+    res.status(200).send(VP);
+  }
 });
 
 app.listen(port, () => {
