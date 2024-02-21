@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
-import { createVerifiableCredentialJwt, createVerifiablePresentationJwt, verifyCredential, verifyPresentation } from 'did-jwt-vc'
-import { ES256KSigner, decodeJWT, hexToBytes } from 'did-jwt';
+import { createVerifiableCredentialJwt, createVerifiablePresentationJwt} from 'did-jwt-vc'
+import { ES256KSigner, hexToBytes } from 'did-jwt';
 
 //details that the app will check for before allowing VP
 const appName = 'my-demo-app';
@@ -38,7 +38,7 @@ app.post('/vprequest', async (req, res) => {
     const crypto = import('crypto');
     const code = (await crypto).randomBytes(16).toString('base64');
     validCodes.push(code);
-    console.log(`Redirecting to /vprequest.html?user=${user}&application=${application}&vcissuer=${vcissuer}&nonce=${nonce}&domain=${domain}&redirect_uri=${redirect_uri}&code=${code}`);
+    console.log(`Redirecting to /vprequest.html?user=${user}&application=${application}&vcissuer=${vcissuer}&nonce=${nonce}&domain=${domain}&redirect_uri=${redirect_uri}&code=${code} for confirmation.`);
     let url = `/vprequest.html?user=${user}&application=${application}&vcissuer=${vcissuer}&nonce=${encodeURIComponent(nonce)}&domain=${domain}&redirect_uri=${redirect_uri}&code=${encodeURIComponent(code)}`;
     res.redirect(url);
   }else{
@@ -134,19 +134,21 @@ const holder = {
 //-VP payload
 //set expiry time
 let today = Math.ceil((Date.now() / 1000));
-let fiveMinsFromNow = today + (5*60*1000);
+let fiveMinsFromNow = today + (5*60);
+console.log('Now: '+today);
+console.log('VP Expiry: '+fiveMinsFromNow);
 const vpPayload = {
   vp: {
     '@context': ['https://www.w3.org/2018/credentials/v1'],
     type: ['VerifiablePresentation'],
     verifiableCredential: [vc],
-    nonce: nonce,
-    domain: domain,
-    appName: appName,
   },
-  exp: fiveMinsFromNow
+  exp: fiveMinsFromNow,
+  nonce: nonce,
+  domain: domain,
+  appName: appName
 }
-//console.log("VP payload:\n"+JSON.stringify(vpPayload));
+console.log("VP payload:\n"+JSON.stringify(vpPayload));
 const vpJwt = await createVerifiablePresentationJwt(vpPayload, holder);
 return vpJwt;
 }
