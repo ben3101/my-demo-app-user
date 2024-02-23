@@ -6,17 +6,24 @@ let nonce = params.get('nonce');
 let domain = params.get('domain');
 let redirect_uri = params.get('redirect_uri');
 let code = params.get('code');
+//Error parameter will be present if the vprequest details were not valid
+let error = params.get('error');
 
 window.setTimeout(()=>{
   vp_approval();
 }, 1000);
 
 async function vp_approval(){
+  if(error){
+    alert(`Unable to create a VP with the provided information.\n\nRedirecting to App...`);
+    window.location.href = `${redirect_uri}`;
+    return;
+  }
   let approved = confirm(`Please confirm you would like to create a VP with the following information: \n\nUser: ${user} \nApplication: ${application} \nIssuer: ${vcissuer}\nDomain:${domain}`);
   if(approved){
     await tryCreateVP();
   }else{
-    alert('VP not granted.');
+    alert('VP not granted. Redirecting to App...');
     window.location.href = `${redirect_uri}`;
   }
 }
